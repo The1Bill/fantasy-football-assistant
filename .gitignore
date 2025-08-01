@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Database
+*.db
+*.sqlite3
+.pgdata/
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# AI models (if large)
+models/*.bin
+models/*.gguf
+models/*.safetensors
+
+# Data files
+data/*.csv
+data/*.json
+data/cache/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Python virtual environments
+fantasyfootball/
+
+# Environment files
+.env*
+!.env.example
