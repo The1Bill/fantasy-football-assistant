@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, X, Users, TrendingUp, Calendar, AlertCircle, RotateCcw } from 'lucide-react';
 import './App.css';
@@ -15,18 +15,20 @@ const App = () => {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const API_KEY = process.env.REACT_APP_API_KEY;
 
-  // API configuration - memoize to prevent recreation on every render
-  const apiClient = useMemo(() => {
-    return axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        'X-API-Key': API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-  }, [API_BASE_URL, API_KEY]);
+  const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'X-API-Key': API_KEY,
+      'Content-Type': 'application/json'
+    }
+  });
 
-  const loadPlayers = useCallback(async () => {
+  // Load players on component mount
+  useEffect(() => {
+    loadPlayers();
+  }, []);
+
+  const loadPlayers = async () => {
     try {
       setLoading(true);
       const [activeResponse, inactiveResponse] = await Promise.all([
@@ -42,12 +44,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
-
-  // Load players on component mount
-  useEffect(() => {
-    loadPlayers();
-  }, [loadPlayers]);
+  };
 
   const addPlayer = async () => {
     if (!newPlayer.name.trim()) return;

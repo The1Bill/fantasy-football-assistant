@@ -1,115 +1,40 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import axios from 'axios';
-import { Plus, X, Users, TrendingUp, Calendar, AlertCircle, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, X, Users, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
 import './App.css';
 
 const App = () => {
-  const [activeRoster, setActiveRoster] = useState([]);
-  const [inactiveRoster, setInactiveRoster] = useState([]);
+  const [roster, setRoster] = useState([
+    { id: 1, name: 'Josh Allen', position: 'QB', team: 'BUF', status: 'active' },
+    { id: 2, name: 'Christian McCaffrey', position: 'RB', team: 'SF', status: 'active' },
+    { id: 3, name: 'Tyreek Hill', position: 'WR', team: 'MIA', status: 'active' },
+  ]);
+  
   const [newPlayer, setNewPlayer] = useState({ name: '', position: 'QB', team: '' });
   const [activeTab, setActiveTab] = useState('roster');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // API configuration
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-  const API_KEY = process.env.REACT_APP_API_KEY;
-
-  // API configuration - memoize to prevent recreation on every render
-  const apiClient = useMemo(() => {
-    return axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        'X-API-Key': API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-  }, [API_BASE_URL, API_KEY]);
-
-  const loadPlayers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [activeResponse, inactiveResponse] = await Promise.all([
-        apiClient.get('/players/active'),
-        apiClient.get('/players/inactive')
-      ]);
-      setActiveRoster(activeResponse.data);
-      setInactiveRoster(inactiveResponse.data);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load players: ' + err.message);
-      console.error('Error loading players:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiClient]);
-
-  // Load players on component mount
-  useEffect(() => {
-    loadPlayers();
-  }, [loadPlayers]);
-
-  const addPlayer = async () => {
-    if (!newPlayer.name.trim()) return;
-
-    try {
-      const response = await apiClient.post('/players', {
+  const addPlayer = () => {
+    if (newPlayer.name.trim()) {
+      setRoster([...roster, {
+        id: Date.now(),
         name: newPlayer.name,
         position: newPlayer.position,
         team: newPlayer.team.toUpperCase(),
         status: 'active'
-      });
-      
-      setActiveRoster([...activeRoster, response.data]);
+      }]);
       setNewPlayer({ name: '', position: 'QB', team: '' });
-      setError(null);
-    } catch (err) {
-      setError('Failed to add player: ' + err.message);
-      console.error('Error adding player:', err);
     }
   };
 
-  const deactivatePlayer = async (playerId) => {
-    try {
-      await apiClient.put(`/players/${playerId}/deactivate`);
-      await loadPlayers(); // Reload to update both lists
-      setError(null);
-    } catch (err) {
-      setError('Failed to deactivate player: ' + err.message);
-      console.error('Error deactivating player:', err);
-    }
-  };
-
-  const reactivatePlayer = async (playerId) => {
-    try {
-      await apiClient.put(`/players/${playerId}/reactivate`);
-      await loadPlayers(); // Reload to update both lists
-      setError(null);
-    } catch (err) {
-      setError('Failed to reactivate player: ' + err.message);
-      console.error('Error reactivating player:', err);
-    }
+  const removePlayer = (id) => {
+    setRoster(roster.filter(player => player.id !== id));
   };
 
   const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
-  const groupRosterByPosition = (roster) => {
-    return positions.reduce((acc, pos) => {
-      acc[pos] = roster.filter(player => player.position === pos);
-      return acc;
-    }, {});
-  };
-
-  const groupedActiveRoster = groupRosterByPosition(activeRoster);
-  const groupedInactiveRoster = groupRosterByPosition(inactiveRoster);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
+  const groupedRoster = positions.reduce((acc, pos) => {
+    acc[pos] = roster.filter(player => player.position === pos);
+    return acc;
+  }, {});
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -118,12 +43,6 @@ const App = () => {
         <div className="bg-white rounded-lg shadow-lg mb-6 p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Fantasy Football Assistant</h1>
           <p className="text-gray-600">Manage your roster and get AI-powered recommendations</p>
-          {error && (
-            <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3">
-              <AlertCircle className="text-red-600 mt-1 flex-shrink-0" size={20} />
-              <div className="text-red-700">{error}</div>
-            </div>
-          )}
         </div>
 
         {/* Navigation Tabs */}
@@ -138,18 +57,7 @@ const App = () => {
               }`}
             >
               <Users size={20} />
-              My Roster ({activeRoster.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('former')}
-              className={`px-6 py-4 font-medium flex items-center gap-2 ${
-                activeTab === 'former' 
-                  ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' 
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <RotateCcw size={20} />
-              Former Players ({inactiveRoster.length})
+              My Roster
             </button>
             <button
               onClick={() => setActiveTab('recommendations')}
@@ -178,33 +86,32 @@ const App = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Active Roster Management */}
+          {/* Roster Management */}
           {activeTab === 'roster' && (
             <>
               <div className="lg:col-span-2 bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Active Roster</h2>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">Current Roster</h2>
                 
                 {positions.map(position => (
                   <div key={position} className="mb-6">
                     <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       {position}
                       <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
-                        {groupedActiveRoster[position]?.length || 0}
+                        {groupedRoster[position]?.length || 0}
                       </span>
                     </h3>
                     
-                    {groupedActiveRoster[position]?.length > 0 ? (
+                    {groupedRoster[position]?.length > 0 ? (
                       <div className="space-y-2">
-                        {groupedActiveRoster[position].map(player => (
+                        {groupedRoster[position].map(player => (
                           <div key={player.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                             <div>
                               <span className="font-medium text-gray-800">{player.name}</span>
                               <span className="text-gray-500 ml-2">({player.team})</span>
                             </div>
                             <button
-                              onClick={() => deactivatePlayer(player.id)}
-                              className="text-orange-500 hover:text-orange-700 p-1"
-                              title="Move to former players"
+                              onClick={() => removePlayer(player.id)}
+                              className="text-red-500 hover:text-red-700 p-1"
                             >
                               <X size={16} />
                             </button>
@@ -213,7 +120,7 @@ const App = () => {
                       </div>
                     ) : (
                       <div className="text-gray-400 italic p-3 bg-gray-50 rounded-lg">
-                        No {position} players in active roster
+                        No {position} players added yet
                       </div>
                     )}
                   </div>
@@ -279,48 +186,6 @@ const App = () => {
             </>
           )}
 
-          {/* Former Players Tab */}
-          {activeTab === 'former' && (
-            <div className="lg:col-span-3 bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Former Players</h2>
-              
-              {positions.map(position => (
-                <div key={position} className="mb-6">
-                  <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    {position}
-                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
-                      {groupedInactiveRoster[position]?.length || 0}
-                    </span>
-                  </h3>
-                  
-                  {groupedInactiveRoster[position]?.length > 0 ? (
-                    <div className="space-y-2">
-                      {groupedInactiveRoster[position].map(player => (
-                        <div key={player.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg opacity-75">
-                          <div>
-                            <span className="font-medium text-gray-600">{player.name}</span>
-                            <span className="text-gray-400 ml-2">({player.team})</span>
-                          </div>
-                          <button
-                            onClick={() => reactivatePlayer(player.id)}
-                            className="text-green-500 hover:text-green-700 p-1"
-                            title="Reactivate player"
-                          >
-                            <RotateCcw size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-gray-400 italic p-3 bg-gray-50 rounded-lg">
-                      No former {position} players
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* AI Recommendations Tab */}
           {activeTab === 'recommendations' && (
             <div className="lg:col-span-3 bg-white rounded-lg shadow-lg p-6">
@@ -370,9 +235,9 @@ const App = () => {
         <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Developer Tools</h3>
           <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-sm text-gray-600 mb-2">Current active roster data (JSON format for your AI agent):</p>
+            <p className="text-sm text-gray-600 mb-2">Current roster data (JSON format for your AI agent):</p>
             <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto">
-              {JSON.stringify(activeRoster, null, 2)}
+              {JSON.stringify(roster, null, 2)}
             </pre>
           </div>
         </div>

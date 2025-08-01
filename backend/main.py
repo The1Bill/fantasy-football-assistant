@@ -1,0 +1,106 @@
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import List, Optional
+import os
+from dotenv import load_dotenv
+from database import engine, get_db, Base
+from crud import (
+    PlayerCreate, PlayerUpdate, PlayerResponse,
+    get_players, get_player, create_player, update_player, delete_player
+)
+from models import Player
+
+# Load environment variables from parent directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Fantasy Football Assistant API", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://192.168.1.114:3456", "http://192.168.1.114:3000", "http://localhost:3456", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# API Key dependency - skip for OPTIONS requests
+async def verify_api_key(request: Request, x_api_key: Optional[str] = Header(None)):
+    # Skip API key check for OPTIONS requests (CORS preflight)
+    if request.method == "OPTIONS":
+        return None
+    
+    expected_key = os.getenv("API_KEY")
+    if not expected_key:
+        raise HTTPException(status_code=500, detail="API key not configured")
+    if x_api_key != expected_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return x_api_key
+
+@app.get("/")
+def read_root():
+    return {"message": "Fantasy Football Assistant API"}
+
+@app.get("/players", response_model=List[PlayerResponse])
+def list_players(db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    return get_players(db)
+
+@app.get("/players/active", response_model=List[PlayerResponse])
+def list_active_players(db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    return db.query(Player).filter(Player.status == "active").all()
+
+@app.get("/players/inactive", response_model=List[PlayerResponse])
+def list_inactive_players(db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    return db.query(Player).filter(Player.status == "inactive").all()
+
+@app.post("/players", response_model=PlayerResponse)
+def add_player(player: PlayerCreate, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    return create_player(db, player)
+
+@app.get("/players/{player_id}", response_model=PlayerResponse)
+def get_player_by_id(player_id: int, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    db_player = get_player(db, player_id)
+    if db_player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return db_player
+
+@app.put("/players/{player_id}", response_model=PlayerResponse)
+def update_player_by_id(player_id: int, player: PlayerUpdate, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    db_player = update_player(db, player_id, player)
+    if db_player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return db_player
+
+@app.put("/players/{player_id}/deactivate")
+def deactivate_player(player_id: int, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    db_player = db.query(Player).filter(Player.id == player_id).first()
+    if db_player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    db_player.status = "inactive"
+    db.commit()
+    return {"message": "Player deactivated successfully"}
+
+@app.put("/players/{player_id}/reactivate")
+def reactivate_player(player_id: int, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    db_player = db.query(Player).filter(Player.id == player_id).first()
+    if db_player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    db_player.status = "active"
+    db.commit()
+    return {"message": "Player reactivated successfully"}
+
+@app.delete("/players/{player_id}")
+def delete_player_by_id(player_id: int, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
+    if not delete_player(db, player_id):
+        raise HTTPException(status_code=404, detail="Player not found")
+    return {"message": "Player deleted successfully"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("API_PORT", 8000))
+    print(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
